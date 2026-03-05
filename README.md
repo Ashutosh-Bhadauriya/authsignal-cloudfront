@@ -1,4 +1,4 @@
-# AuthSignal Adaptive MFA Demo — Lambda@Edge
+# AuthSignal Adaptive MFA Demo - Lambda@Edge
 
 A demo app showing how AuthSignal intercepts login requests at the CloudFront edge
 to add adaptive multi-factor authentication — without modifying the origin application.
@@ -20,11 +20,11 @@ User → CloudFront → Lambda@Edge (risk check) → AuthSignal MFA → Session 
 
 ## Prerequisites
 
-- **AWS Account** — with admin access
-- **AWS CLI** — [Install guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- **AWS SAM CLI** — [Install guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
-- **Node.js 20+** — [Download](https://nodejs.org/)
-- **AuthSignal Account** — [Sign up free](https://portal.authsignal.com)
+- **AWS Account** - with admin access
+- **AWS CLI** - [Install guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- **AWS SAM CLI** - [Install guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+- **Node.js 20+** - [Download](https://nodejs.org/)
+- **AuthSignal Account** - [Sign up free](https://portal.authsignal.com)
 
 ## Setup
 
