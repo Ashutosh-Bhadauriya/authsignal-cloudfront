@@ -1,0 +1,12 @@
+{
+  "name": "authsignal-demo-origin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple demo login app (origin behind CloudFront)",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.21.0",
+    "cookie-parser": "^1.4.7",
+    "@vendia/serverless-express": "^4.12.6"
+  }
+}

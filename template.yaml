@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AuthSignal Adaptive MFA Demo — CloudFront + Lambda@Edge.
+  MUST be deployed to us-east-1 (required for Lambda@Edge).
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+
+Resources:
+  # -------------------------------------------------------
+  # Origin: simple login app behind API Gateway (HTTP API)
+  # -------------------------------------------------------
+  OriginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: origin-app/
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 30
+      Events:
+        RootGet:
+          Type: HttpApi
+        ProxyAll:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+  # -------------------------------------------------------
+  # IAM Role for Lambda@Edge (trusted by edgelambda.amazonaws.com)
+  # -------------------------------------------------------
+  EdgeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # -------------------------------------------------------
+  # Lambda@Edge: Viewer Request
+  # Captures username from login POST, encrypts into cookie
+  # -------------------------------------------------------
+  ViewerRequestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: viewer-request/index.handler
+      MemorySize: 128
+      Timeout: 5
+      Role: !GetAtt EdgeLambdaRole.Arn
+      AutoPublishAlias: live
+
+  # -------------------------------------------------------
+  # Lambda@Edge: Origin Response
+  # Calls AuthSignal risk API after successful login
+  # -------------------------------------------------------
+  OriginResponseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: origin-response/index.handler
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt EdgeLambdaRole.Arn
+      AutoPublishAlias: live
+
+  # -------------------------------------------------------
+  # Lambda@Edge: Origin Request
+  # Validates AuthSignal token and restores session
+  # -------------------------------------------------------
+  OriginRequestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: origin-request/index.handler
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt EdgeLambdaRole.Arn
+      AutoPublishAlias: live
+
+  # -------------------------------------------------------
+  # CloudFront Distribution
+  # -------------------------------------------------------
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: AuthSignal Adaptive MFA Demo
+        HttpVersion: http2
+        DefaultCacheBehavior:
+          TargetOriginId: OriginApi
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - PATCH
+            - POST
+            - DELETE
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !Ref ViewerRequestFunction.Version
+              IncludeBody: true
+            - EventType: origin-request
+              LambdaFunctionARN: !Ref OriginRequestFunction.Version
+            - EventType: origin-response
+              LambdaFunctionARN: !Ref OriginResponseFunction.Version
+        Origins:
+          - Id: OriginApi
+            DomainName: !Sub "${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+
+Outputs:
+  CloudFrontUrl:
+    Description: Open this URL in your browser to use the demo
+    Value: !Sub "https://${Distribution.DomainName}"
+
+  ApiUrl:
+    Description: Direct API Gateway URL (bypasses Lambda@Edge — for debugging)
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  DistributionId:
+    Description: CloudFront distribution ID (for invalidation)
+    Value: !Ref Distribution
